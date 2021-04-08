@@ -9,10 +9,9 @@ from flask_cors import CORS
 from utils import APIException, generate_sitemap
 from admin import setup_admin
 from models import db, User, Planets, Character, Favorites
-import datetime
 
 ## Nos permite hacer las encripciones de contraseñas
-from werkzeug.security import generate_password_hash, check_password_hash
+# from werkzeug.security import generate_password_hash, check_password_hash
 
 ## Nos permite manejar tokens por authentication (usuarios) 
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
@@ -80,7 +79,7 @@ def get_onePlanet(id):
 
 @app.route('/users/favorites', methods=['GET'])
 def get_favorites():
-    favorites = Favorites.query.filter_by(user_id = user.id)
+    favorites = Favorites.query.filter_by(user_id = User.id)
     # favorites = Favorites.query.all()
     # print(favorites)
     
@@ -103,7 +102,7 @@ def add_fav():
     user = User.query.filter_by(email = email).first()
     # recibir info del request
     add_new_fav = request.get_json()
-    newFav = Favorites(user_id=user.id, tipo=add_new_fav["tipo"],object_id=add_new_fav["object_id"])
+    newFav = Favorites(user_id=user.id, tipo=add_new_fav["tipo"],favorite_id=add_new_fav["favorite_id"])
     db.session.add(newFav)
     db.session.commit()
 
@@ -123,40 +122,35 @@ def del_fav(favorite_id):
 
     return jsonify("All good"), 200
 
-#registro
+#register
 @app.route('/register', methods=["POST"])
 def register():
     if request.method == 'POST':
         email = request.json.get("email", None)
         password = request.json.get("password", None)
-        name = request.json.get("name", None)
-        last_name = request.json.get("last_name", None)
+        user = request.json.get("user", None)
+        # last_name = request.json.get("last_name", None)
     
 
         if not email:
             return jsonify({"msg": "email is required"}), 400
         if not password:
             return jsonify({"msg": "Password is required"}), 400
-        if not name:
-            return jsonify({"msg": "Name is required"}), 400
-        if not last_name:
-            return jsonify({"msg": "Last name is required"}), 400
+        if not user:
+            return jsonify({"msg": "username is required"}), 400
+        # if not last_name:
+        #     return jsonify({"msg": "Last name is required"}), 400
        
 
         user = User.query.filter_by(email=email).first()
         if user:
             return jsonify({"msg": "This username already exists"}), 400
 
-        user = User()
-        user.email = email
-        user.name = name
-        user.last_name = last_name
-        user.is_active = True
-        hashed_password = generate_password_hash(password)
-        print(password, hashed_password)
-
-        user.password = hashed_password
-
+        adduser = User()
+        adduser.email = email
+        adduser.last_name = last_name
+        adduser.is_active = True
+        adduser.password = password
         db.session.add(user)
         db.session.commit()
 
@@ -178,17 +172,15 @@ def login():
         if not user:
             return jsonify({"msg": "Username/Password are incorrect"}), 401
 
-        if not check_password_hash(user.password, password):
+        if not check_password(user.password, password):
             return jsonify({"msg": "Username/Password are incorrect"}), 401
 
         # crear el token
-        expiracion = datetime.timedelta(days=3)
-        access_token = create_access_token(identity=user.email, expires_delta=expiracion)
+        access_token = create_access_token(identity=user.email)
 
         data = {
             "user": user.serialize(),
-            "token": access_token,
-            "expires": expiracion.total_seconds()*1000
+            "token": access_token
         }
 
         return jsonify(data), 200
